@@ -17,6 +17,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import com.dinofit.app.core.designsystem.Motion
+import com.dinofit.app.core.designsystem.FlameChip
+import com.dinofit.app.core.designsystem.streakMessage
+import com.dinofit.app.core.model.Streak
 import com.dinofit.app.core.designsystem.pressClickable
 import com.dinofit.app.core.designsystem.riseIn
 import kotlinx.coroutines.launch
@@ -152,7 +155,15 @@ private fun IdleContent(state: WorkoutUiState.Idle, onStart: () -> Unit, onDelet
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        PageHeader("$n séance${if (n > 1) "s" else ""} enregistrée${if (n > 1) "s" else ""}", "Séance", Modifier.padding(bottom = 0.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            PageHeader("$n séance${if (n > 1) "s" else ""} enregistrée${if (n > 1) "s" else ""}", "Séance", Modifier.weight(1f).padding(bottom = 0.dp))
+            FlameChip(state.streak, iconSize = 34.dp)
+        }
+        Text(
+            streakMessage(state.streak)
+                ?: "Ta flamme compte tes séances d'affilée. Elle tient tant que tu ne passes pas plus de 2 jours sans séance (record : ${state.streak.best}).",
+            style = DinoType.Small, color = if (state.streak.atRisk) DinoColors.Lava else DinoColors.InkDim,
+        )
         Panel(title = "Prêt à soulever ?") {
             Text(
                 "Choisis tes exercices, note le poids et les répétitions de chaque série. Tout est enregistré au fur et à mesure, même si tu fermes l'app.",
@@ -426,10 +437,19 @@ private fun SavedDialog(e: WorkoutEvent.Saved, onDismiss: () -> Unit) {
         containerColor = DinoColors.Bg,
         title = { Text("Séance enregistrée", style = DinoType.Title) },
         text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                FlameChip(Streak(e.streak, alive = true, atRisk = false, best = e.streak), iconSize = 36.dp)
+                Text(
+                    if (e.streak <= 1) "Ta flamme est allumée !" else "Ta flamme passe à ${e.streak} séances d'affilée !",
+                    style = DinoType.BodyBold, color = DinoColors.AmberInk,
+                )
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 StatTile("Tonnage", e.tonnage, Modifier.weight(1f), DinoColors.AmberInk)
                 StatTile("Calories", e.kcal, Modifier.weight(1f), DinoColors.Lava)
                 StatTile("Durée", e.duration, Modifier.weight(1f))
+            }
             }
         },
         confirmButton = { PillButton("Fermer", onClick = onDismiss, style = PillStyle.Primary) },

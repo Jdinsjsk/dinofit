@@ -59,5 +59,6 @@ object Formats {
     }
 
     /** Accepte "72,5" comme "72.5". */
-    fun parseDecimal(text: String): Double = text.replace(',', '.').trim().toDoubleOrNull() ?: 0.0
+    fun parseDecimal(text: String): Double =
+        text.replace(',', '.').filterNot { it.isWhitespace() || it == '\u202F' || it == '\u00A0' }.toDoubleOrNull() ?: 0.0
 }

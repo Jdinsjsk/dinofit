@@ -88,6 +88,7 @@ object NavIcons {
         "M16 6c2 0 3 2 3 5s-1 6-3 6-3-3-3-6 1-5 3-5z",
     )
     val Workout = strokeIcon("M3 9v6M6 6v12M18 6v12M21 9v6M6 12h12")
+    val Meals = strokeIcon("M7 3v8a2 2 0 0 0 4 0V3", "M9 11v10", "M17 21V3c-2 1-3 4-3 7s1 4 3 4")
     val Walk = strokeIcon("M9 20l-5-2V4l5 2 6-2 5 2v14l-5-2-6 2z", "M9 6v14", "M15 4v14")
     val Ranks = strokeIcon("M3 15c3 0 5-1 7-1h4l2-5c1-2 3-3 5-2l-1 2-2 1-1 5-2 2v3h-2v-3h-4v3H7v-3c-2 0-3-1-4-2z")
     val Profile = strokeIcon("M16 8a4 4 0 1 1-8 0a4 4 0 1 1 8 0z", "M4 21c1-4 4-6 8-6s7 2 8 6")

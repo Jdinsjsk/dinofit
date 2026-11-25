@@ -35,6 +35,22 @@
             </intent-filter>
         </activity>
 
+        <!-- Photos de repas : l'appareil photo écrit dans le cache de l'app -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <!-- Télécharge le scanner de codes-barres de Google Play dès l'installation -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="barcode_ui" />
+
         <service
             android:name=".walk.WalkTrackingService"
             android:exported="false"

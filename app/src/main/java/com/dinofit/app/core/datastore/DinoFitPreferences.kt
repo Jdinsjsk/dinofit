@@ -28,6 +28,8 @@ class DinoFitPreferences @Inject constructor(
         val height = intPreferencesKey("height_cm")
         val stepGoal = intPreferencesKey("step_goal")
         val lastRawSteps = longPreferencesKey("last_raw_steps")
+        val kcalGoal = intPreferencesKey("kcal_goal")
+        val claudeApiKey = stringPreferencesKey("claude_api_key")
     }
 
     val profile: Flow<UserProfile> = dataStore.data.map { p ->
@@ -51,6 +53,20 @@ class DinoFitPreferences @Inject constructor(
             p[Keys.height] = profile.heightCm
             p[Keys.stepGoal] = profile.stepGoal
         }
+    }
+
+    /** null = pas encore choisi (on propose alors un objectif calculé). */
+    val kcalGoal: Flow<Int?> = dataStore.data.map { it[Keys.kcalGoal] }
+
+    suspend fun setKcalGoal(value: Int) {
+        dataStore.edit { it[Keys.kcalGoal] = value }
+    }
+
+    /** Clé API Claude facultative, gardée uniquement sur le téléphone. */
+    val claudeApiKey: Flow<String> = dataStore.data.map { it[Keys.claudeApiKey].orEmpty() }
+
+    suspend fun setClaudeApiKey(value: String) {
+        dataStore.edit { it[Keys.claudeApiKey] = value.trim() }
     }
 
     suspend fun lastRawSteps(): Long? = dataStore.data.first()[Keys.lastRawSteps]

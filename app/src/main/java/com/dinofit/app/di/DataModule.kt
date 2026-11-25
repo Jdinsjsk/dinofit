@@ -15,6 +15,10 @@ import com.dinofit.app.core.data.WorkoutRepository
 import com.dinofit.app.core.database.CustomExerciseDao
 import com.dinofit.app.core.database.DinoFitDatabase
 import com.dinofit.app.core.database.MIGRATION_1_2
+import com.dinofit.app.core.database.MIGRATION_2_3
+import com.dinofit.app.core.database.MealDao
+import com.dinofit.app.core.data.NutritionRepository
+import com.dinofit.app.core.data.OfflineFirstNutritionRepository
 import com.dinofit.app.core.database.WalkDao
 import com.dinofit.app.core.data.OfflineFirstWalkRepository
 import com.dinofit.app.core.data.WalkRepository
@@ -35,13 +39,14 @@ object DatabaseModule {
     @Singleton
     fun database(@ApplicationContext context: Context): DinoFitDatabase =
         Room.databaseBuilder(context, DinoFitDatabase::class.java, "dinofit.db")
-            .addMigrations(MIGRATION_1_2)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
             .build()
 
     @Provides fun workoutDao(db: DinoFitDatabase): WorkoutDao = db.workoutDao()
     @Provides fun stepsDao(db: DinoFitDatabase): StepsDao = db.stepsDao()
     @Provides fun customExerciseDao(db: DinoFitDatabase): CustomExerciseDao = db.customExerciseDao()
     @Provides fun walkDao(db: DinoFitDatabase): WalkDao = db.walkDao()
+    @Provides fun mealDao(db: DinoFitDatabase): MealDao = db.mealDao()
 
     @Provides
     @Singleton
@@ -56,4 +61,5 @@ internal abstract class RepositoryModule {
     @Binds abstract fun steps(impl: OfflineFirstStepsRepository): StepsRepository
     @Binds abstract fun profile(impl: DataStoreProfileRepository): ProfileRepository
     @Binds abstract fun walks(impl: OfflineFirstWalkRepository): WalkRepository
+    @Binds abstract fun nutrition(impl: OfflineFirstNutritionRepository): NutritionRepository
 }

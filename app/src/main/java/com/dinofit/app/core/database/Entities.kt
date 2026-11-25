@@ -88,3 +88,17 @@ data class WalkPointEntity(
     val lat: Double,
     val lon: Double,
 )
+
+/** Un repas ou un aliment. [date] au format ISO : la jauge du jour ne prend que la date du jour. */
+@Entity(tableName = "meals", indices = [Index("date")])
+data class MealEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val date: String,
+    val time: Long,
+    val name: String,
+    val kcal: Double,
+    val protein: Double,
+    val carbs: Double,
+    val fat: Double,
+    val source: String,
+)

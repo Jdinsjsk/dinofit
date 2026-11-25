@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
@@ -43,6 +44,13 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dinofit.app.core.common.Formats
 import com.dinofit.app.core.designsystem.DinoColors
+import com.dinofit.app.core.designsystem.FlameChip
+import com.dinofit.app.core.designsystem.NavIcons
+import com.dinofit.app.core.designsystem.ProgressBar
+import com.dinofit.app.core.designsystem.pressClickable
+import com.dinofit.app.core.designsystem.streakMessage
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import com.dinofit.app.core.designsystem.DinoType
 import com.dinofit.app.core.designsystem.Panel
 import com.dinofit.app.core.designsystem.PageHeader
@@ -60,10 +68,15 @@ fun HomeRoute(
     onOpenWorkout: () -> Unit,
     onOpenRanks: () -> Unit,
     onOpenWalk: () -> Unit,
+    onOpenMeals: () -> Unit,
+    onOpenProfile: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    HomeScreen(uiState = uiState, onAction = viewModel::onAction, onOpenWorkout = onOpenWorkout, onOpenRanks = onOpenRanks, onOpenWalk = onOpenWalk)
+    HomeScreen(
+        uiState = uiState, onAction = viewModel::onAction, onOpenWorkout = onOpenWorkout, onOpenRanks = onOpenRanks,
+        onOpenWalk = onOpenWalk, onOpenMeals = onOpenMeals, onOpenProfile = onOpenProfile,
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -74,6 +87,8 @@ internal fun HomeScreen(
     onOpenWorkout: () -> Unit,
     onOpenRanks: () -> Unit,
     onOpenWalk: () -> Unit,
+    onOpenMeals: () -> Unit,
+    onOpenProfile: () -> Unit,
 ) {
     val state = uiState as? HomeUiState.Success ?: return
     val context = LocalContext.current
@@ -104,11 +119,20 @@ internal fun HomeScreen(
             .padding(horizontal = 16.dp, vertical = 20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        PageHeader(
-            kicker = Formats.longDate(LocalDate.now()),
-            title = if (state.profile.name.isBlank()) "Salut" else "Salut ${state.profile.name}",
-            modifier = Modifier.padding(bottom = 0.dp),
-        )
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            PageHeader(
+                kicker = Formats.longDate(LocalDate.now()),
+                title = if (state.profile.name.isBlank()) "Salut" else "Salut ${state.profile.name}",
+                modifier = Modifier.weight(1f).padding(bottom = 0.dp),
+            )
+            FlameChip(state.streak, Modifier.pressClickable(onClickLabel = "Voir mes séances", onClick = onOpenWorkout))
+            IconButton(onClick = onOpenProfile) {
+                Icon(NavIcons.Profile, contentDescription = "Profil", tint = DinoColors.InkDim)
+            }
+        }
+        streakMessage(state.streak)?.let {
+            Text(it, style = DinoType.Small, color = if (state.streak.atRisk) DinoColors.Lava else DinoColors.InkDim, modifier = Modifier.offset(y = (-8).dp))
+        }
         RankHero(state.tonnageKg, state.rank, state.nextRank, state.progress, onClick = onOpenRanks)
 
         Panel(title = "Dernières séances") {
@@ -122,6 +146,21 @@ internal fun HomeScreen(
                 text = if (state.hasActiveSession) "Reprendre la séance" else "Commencer une séance",
                 onClick = onOpenWorkout, style = PillStyle.Primary,
             )
+        }
+
+        Panel(title = "Repas du jour") {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
+                Text("${Formats.int(state.eatenKcal)} kcal", style = DinoType.Number, color = if (state.eatenKcal > state.kcalGoal) DinoColors.Lava else DinoColors.Ink)
+                Text("sur ${Formats.int(state.kcalGoal)}", style = DinoType.Small, color = DinoColors.InkDim)
+            }
+            Spacer(Modifier.height(8.dp))
+            ProgressBar(
+                if (state.kcalGoal > 0) state.eatenKcal.toFloat() / state.kcalGoal else 0f,
+                color = if (state.eatenKcal > state.kcalGoal) DinoColors.Lava else DinoColors.Green,
+                track = DinoColors.Card2,
+            )
+            Spacer(Modifier.height(12.dp))
+            PillButton("Ajouter un repas", onClick = onOpenMeals)
         }
 
         Panel(title = "Pas du jour") {

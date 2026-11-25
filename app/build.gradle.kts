@@ -15,15 +15,26 @@ android {
         applicationId = "com.dinofit.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        // Chaque fabrication sur GitHub a un numéro plus grand : le téléphone l'accepte comme mise à jour.
+        val run = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
+        versionCode = run
+        versionName = "1.1.$run"
+    }
+
+    // Toujours la même clé de signature : les mises à jour s'installent par-dessus, sans perdre les données.
+    signingConfigs {
+        create("perso") {
+            storeFile = file("dinofit-release.keystore")
+            storePassword = "dinofit-perso"
+            keyAlias = "dinofit"
+            keyPassword = "dinofit-perso"
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
-            // Signée avec la clé de debug pour pouvoir l'installer directement sur ton téléphone.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("perso")
         }
     }
     compileOptions {
@@ -72,6 +83,11 @@ dependencies {
 
     // Carte OpenStreetMap (gratuite, sans clé)
     implementation(libs.osmdroid.android)
+
+    // Repas : lecture d'étiquette sur le téléphone (gratuit, hors ligne) et scan de code-barres
+    implementation(libs.mlkit.text.recognition)
+    implementation(libs.play.services.code.scanner)
+    implementation(libs.kotlinx.coroutines.play.services)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

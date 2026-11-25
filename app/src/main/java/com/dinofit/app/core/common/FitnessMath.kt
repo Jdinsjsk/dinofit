@@ -6,6 +6,9 @@ import com.dinofit.app.core.model.Exercise
 import com.dinofit.app.core.model.LatLng
 import com.dinofit.app.core.model.PersonalRecord
 import com.dinofit.app.core.model.Sex
+import com.dinofit.app.core.model.Streak
+import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 import com.dinofit.app.core.model.UserProfile
 import com.dinofit.app.core.model.WorkoutSession
 import com.dinofit.app.core.model.WorkoutSet
@@ -77,6 +80,44 @@ object FitnessMath {
             }
         }
         return best.values.sortedByDescending { it.estimatedMaxKg }
+    }
+
+    // ---------- Flamme ----------
+
+    /** Plus de 3 jours entre deux séances (soit 3 jours vides) : la flamme s'éteint. */
+    const val STREAK_MAX_GAP_DAYS = 3L
+
+    /**
+     * Série de séances : elle continue tant qu'il n'y a pas plus de 2 jours d'affilée sans séance.
+     * Le nombre = séances enregistrées dans la série (deux séances le même jour comptent deux fois).
+     */
+    fun streak(sessionDays: List<LocalDate>, today: LocalDate): Streak {
+        if (sessionDays.isEmpty()) return Streak(0, alive = false, atRisk = false, best = 0)
+        val days = sessionDays.sorted()
+        var run = 0
+        var best = 0
+        var prev: LocalDate? = null
+        for (d in days) {
+            run = if (prev != null && ChronoUnit.DAYS.between(prev, d) > STREAK_MAX_GAP_DAYS) 1 else run + 1
+            best = maxOf(best, run)
+            prev = d
+        }
+        val sinceLast = ChronoUnit.DAYS.between(days.last(), today)
+        val alive = sinceLast <= STREAK_MAX_GAP_DAYS
+        return Streak(
+            count = if (alive) run else 0,
+            alive = alive,
+            atRisk = alive && sinceLast == STREAK_MAX_GAP_DAYS,
+            best = best,
+        )
+    }
+
+    // ---------- Repas ----------
+
+    /** Objectif proposé : métabolisme de base (Mifflin-St Jeor) × 1,45 (activité modérée), arrondi à 50. */
+    fun suggestedKcalGoal(p: UserProfile): Int {
+        val bmr = 10 * p.weightKg + 6.25 * p.heightCm - 5 * p.age + if (p.sex == Sex.FEMALE) -161 else 5
+        return ((bmr * 1.45) / 50).roundToInt() * 50
     }
 
     // ---------- Marches GPS ----------

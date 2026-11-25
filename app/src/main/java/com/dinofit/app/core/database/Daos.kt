@@ -135,3 +135,15 @@ interface WalkDao {
     @Query("DELETE FROM walks WHERE id = :id")
     suspend fun delete(id: Long)
 }
+
+@Dao
+interface MealDao {
+    @Query("SELECT * FROM meals WHERE date = :isoDate ORDER BY time")
+    fun on(isoDate: String): Flow<List<MealEntity>>
+
+    @Insert
+    suspend fun insert(meal: MealEntity): Long
+
+    @Query("DELETE FROM meals WHERE id = :id")
+    suspend fun delete(id: Long)
+}

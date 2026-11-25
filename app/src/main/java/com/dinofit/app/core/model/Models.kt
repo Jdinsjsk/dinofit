@@ -88,3 +88,31 @@ data class Walk(
     val distanceM: Double,
     val steps: Int,
 )
+
+/** Série en cours : [count] séances sans pause de plus de 2 jours. [atRisk] = dernier jour pour la garder. */
+data class Streak(val count: Int, val alive: Boolean, val atRisk: Boolean, val best: Int)
+
+data class Nutrients(val kcal: Double, val protein: Double, val carbs: Double, val fat: Double) {
+    operator fun plus(o: Nutrients) = Nutrients(kcal + o.kcal, protein + o.protein, carbs + o.carbs, fat + o.fat)
+    operator fun times(factor: Double) = Nutrients(kcal * factor, protein * factor, carbs * factor, fat * factor)
+
+    companion object {
+        val ZERO = Nutrients(0.0, 0.0, 0.0, 0.0)
+    }
+}
+
+enum class MealSource(val label: String) {
+    BARCODE("Code-barres"),
+    LABEL("Étiquette"),
+    PHOTO_AI("Photo analysée par Claude"),
+    MANUAL("Saisie manuelle"),
+}
+
+data class Meal(
+    val id: Long,
+    val date: LocalDate,
+    val time: Long,
+    val name: String,
+    val nutrients: Nutrients,
+    val source: MealSource,
+)

@@ -37,6 +37,7 @@ import com.dinofit.app.feature.fact.FactDialog
 import com.dinofit.app.feature.fact.FactViewModel
 import com.dinofit.app.feature.home.HomeRoute
 import com.dinofit.app.feature.walk.WalkRoute
+import com.dinofit.app.feature.meals.MealsRoute
 import com.dinofit.app.feature.profile.ProfileRoute
 import com.dinofit.app.feature.ranks.RanksRoute
 import com.dinofit.app.feature.workout.WorkoutRoute
@@ -54,12 +55,14 @@ private fun tabExit(forward: Boolean): ExitTransition =
     fadeOut(tween(Motion.EXIT, easing = Motion.EaseIn)) +
         slideOutHorizontally(tween(Motion.EXIT, easing = Motion.EaseIn)) { w -> if (forward) -w / 30 else w / 30 }
 
-enum class TopDestination(val route: String, val label: String, val icon: ImageVector) {
+/** 5 onglets en bas ; le profil s'ouvre depuis l'icône de l'accueil. */
+enum class TopDestination(val route: String, val label: String, val icon: ImageVector, val inBar: Boolean = true) {
     HOME("home", "Aujourd'hui", NavIcons.Today),
+    MEALS("meals", "Repas", NavIcons.Meals),
     WALK("walk", "Marche", NavIcons.Walk),
     WORKOUT("workout", "Séance", NavIcons.Workout),
     RANKS("ranks", "Rangs", NavIcons.Ranks),
-    PROFILE("profile", "Profil", NavIcons.Profile),
+    PROFILE("profile", "Profil", NavIcons.Profile, inBar = false),
 }
 
 @Composable
@@ -83,7 +86,7 @@ fun DinoFitApp(factViewModel: FactViewModel = hiltViewModel()) {
             Column {
             HorizontalDivider(color = DinoColors.Line)
             NavigationBar(containerColor = DinoColors.Bg, tonalElevation = 0.dp) {
-                TopDestination.entries.forEach { dest ->
+                TopDestination.entries.filter { it.inBar }.forEach { dest ->
                     NavigationBarItem(
                         selected = current == dest.route,
                         onClick = { navigate(dest) },
@@ -116,7 +119,10 @@ fun DinoFitApp(factViewModel: FactViewModel = hiltViewModel()) {
                     onOpenWorkout = { navigate(TopDestination.WORKOUT) },
                     onOpenRanks = { navigate(TopDestination.RANKS) },
                     onOpenWalk = { navigate(TopDestination.WALK) },
+                    onOpenMeals = { navigate(TopDestination.MEALS) },
+                    onOpenProfile = { navigate(TopDestination.PROFILE) },
                 ) }
+            composable(TopDestination.MEALS.route) { MealsRoute() }
             composable(TopDestination.WALK.route) { WalkRoute() }
             composable(TopDestination.WORKOUT.route) { WorkoutRoute() }
             composable(TopDestination.RANKS.route) { RanksRoute() }

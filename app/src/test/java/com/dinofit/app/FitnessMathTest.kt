@@ -105,3 +105,80 @@ class WalkMathTest {
         assertEquals("2,4 km", Formats.distance(2_400.0))
     }
 }
+
+class StreakAndLabelTest {
+    private val today = java.time.LocalDate.of(2026, 11, 26)
+    private fun d(daysAgo: Long) = today.minusDays(daysAgo)
+
+    @Test fun streak_allows_two_rest_days() {
+        // Séances il y a 9, 6, 3 et 0 jours : jamais plus de 2 jours vides → 4
+        val s = FitnessMath.streak(listOf(d(9), d(6), d(3), d(0)), today)
+        assertEquals(4, s.count); assertTrue(s.alive); assertTrue(!s.atRisk)
+    }
+
+    @Test fun streak_breaks_after_three_empty_days() {
+        // 10 → 6 : 3 jours vides, la série repart de 1 ; 6 → 3 : 2 jours vides, elle continue
+        val s = FitnessMath.streak(listOf(d(10), d(6), d(3)), today)
+        assertEquals(2, s.count); assertEquals(2, s.best); assertTrue(s.atRisk)
+        val dead = FitnessMath.streak(listOf(d(5)), today)
+        assertEquals(0, dead.count); assertTrue(!dead.alive); assertEquals(1, dead.best)
+    }
+
+    @Test fun streak_last_day_is_at_risk_and_same_day_counts_twice() {
+        val s = FitnessMath.streak(listOf(d(3), d(3)), today)
+        assertEquals(2, s.count); assertTrue(s.atRisk)
+        assertEquals(0, FitnessMath.streak(emptyList(), today).count)
+    }
+
+    @Test fun kcal_goal_is_reasonable() {
+        val g = FitnessMath.suggestedKcalGoal(com.dinofit.app.core.model.UserProfile(age = 24, weightKg = 78.0, heightCm = 180))
+        assertTrue(g in 2400..2800)
+        assertEquals(0, g % 50)
+    }
+
+    private fun line(t: String, l: Int, top: Int, r: Int = l + 200) = com.dinofit.app.core.common.OcrLine(t, l, top, r, top + 30)
+
+    @Test fun label_french_same_line() {
+        val r = com.dinofit.app.core.common.NutritionLabelParser.parse(listOf(
+            line("Valeurs nutritionnelles pour 100 g", 0, 0),
+            line("Énergie 1046 kJ / 250 kcal", 0, 40),
+            line("Matières grasses 9,5 g", 0, 80),
+            line("dont acides gras saturés 3,1 g", 0, 120),
+            line("Glucides 30 g", 0, 160),
+            line("dont sucres 12 g", 0, 200),
+            line("Protéines 8,1 g", 0, 240),
+            line("Sel <0,5 g", 0, 280),
+            line("Portion de 30 g", 0, 320),
+        ))
+        assertEquals(250.0, r.kcal!!, 0.01)
+        assertEquals(9.5, r.fat!!, 0.01)
+        assertEquals(30.0, r.carbs!!, 0.01)
+        assertEquals(8.1, r.protein!!, 0.01)
+        assertEquals(30.0, r.servingGrams!!, 0.01)
+    }
+
+    @Test fun label_german_two_columns() {
+        // Noms à gauche, valeurs dans une colonne à droite (comme souvent après la lecture OCR)
+        val r = com.dinofit.app.core.common.NutritionLabelParser.parse(listOf(
+            line("Nährwerte", 0, 0), line("pro 100 g", 400, 0),
+            line("Brennwert", 0, 40), line("1680 kJ / 400 kcal", 400, 42),
+            line("Fett", 0, 80), line("12 g", 400, 82),
+            line("davon gesättigte Fettsäuren", 0, 120), line("5,0 g", 400, 122),
+            line("Kohlenhydrate", 0, 160), line("60 g", 400, 158),
+            line("davon Zucker", 0, 200), line("20 g", 400, 202),
+            line("Eiweiß", 0, 240), line("9,0 g", 400, 241),
+        ))
+        assertEquals(400.0, r.kcal!!, 0.01)
+        assertEquals(12.0, r.fat!!, 0.01)
+        assertEquals(60.0, r.carbs!!, 0.01)
+        assertEquals(9.0, r.protein!!, 0.01)
+        assertTrue(r.isUseful)
+    }
+
+    @Test fun label_kj_only_and_garbage() {
+        val r = com.dinofit.app.core.common.NutritionLabelParser.parse(listOf(line("Energy 836 kJ", 0, 0)))
+        assertEquals(199.8, r.kcal!!, 0.1)
+        val none = com.dinofit.app.core.common.NutritionLabelParser.parse(listOf(line("Ingrédients : farine, eau", 0, 0)))
+        assertTrue(!none.isUseful)
+    }
+}

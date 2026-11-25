@@ -9,6 +9,10 @@ import com.dinofit.app.core.data.WorkoutRepository
 import com.dinofit.app.core.model.DinoRank
 import com.dinofit.app.core.model.Exercise
 import com.dinofit.app.core.model.MuscleGroup
+import com.dinofit.app.core.model.Streak
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import com.dinofit.app.core.model.WorkoutSession
 import com.dinofit.app.core.model.WorkoutSet
 import com.dinofit.app.core.ui.SessionSummary
@@ -35,7 +39,7 @@ data class ActiveEntry(
 
 sealed interface WorkoutUiState {
     data object Loading : WorkoutUiState
-    data class Idle(val history: List<SessionSummary>) : WorkoutUiState
+    data class Idle(val history: List<SessionSummary>, val streak: Streak) : WorkoutUiState
     data class Active(
         val sessionId: Long,
         val startedAt: Long,
@@ -47,7 +51,7 @@ sealed interface WorkoutUiState {
 
 sealed interface WorkoutEvent {
     data class RankUp(val rank: DinoRank) : WorkoutEvent
-    data class Saved(val tonnage: String, val kcal: String, val duration: String) : WorkoutEvent
+    data class Saved(val tonnage: String, val kcal: String, val duration: String, val streak: Int) : WorkoutEvent
     data object NothingToSave : WorkoutEvent
 }
 
@@ -81,7 +85,7 @@ class WorkoutViewModel @Inject constructor(
         profileRepository.profile,
     ) { active, history, profile ->
         if (active == null) {
-            WorkoutUiState.Idle(history.map { it.toSummary(profile) })
+            WorkoutUiState.Idle(history.map { it.toSummary(profile) }, streakOf(history))
         } else {
             WorkoutUiState.Active(
                 sessionId = active.id,
@@ -94,6 +98,11 @@ class WorkoutViewModel @Inject constructor(
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), WorkoutUiState.Loading)
+
+    private fun streakOf(sessions: List<WorkoutSession>): Streak = FitnessMath.streak(
+        sessions.map { Instant.ofEpochMilli(it.startedAt).atZone(ZoneId.systemDefault()).toLocalDate() },
+        LocalDate.now(),
+    )
 
     private fun hintFor(exercise: Exercise, history: List<WorkoutSession>): String {
         val last = history.firstNotNullOfOrNull { s -> s.entries.firstOrNull { it.exercise.id == exercise.id } }
@@ -145,6 +154,7 @@ class WorkoutViewModel @Inject constructor(
                     tonnage = Formats.tonnage(tonnage),
                     kcal = Formats.int(FitnessMath.sessionKcal(session, profile).roundToInt()),
                     duration = Formats.duration(session.durationMin),
+                    streak = streakOf(workoutRepository.finishedSessions.first()).count,
                 )
             },
         )
