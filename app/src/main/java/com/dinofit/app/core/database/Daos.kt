@@ -55,6 +55,9 @@ interface WorkoutDao {
     @Query("SELECT COUNT(*) FROM sets WHERE sessionId = :sessionId")
     suspend fun countSets(sessionId: Long): Int
 
+    @Query("SELECT COUNT(*) FROM sessions WHERE startedAt = :startedAt")
+    suspend fun countByStart(startedAt: Long): Int
+
     /** Séries de la dernière séance terminée contenant cet exercice. */
     @Query(
         """
@@ -79,6 +82,9 @@ abstract class StepsDao {
     @Upsert
     abstract suspend fun upsert(entity: DailyStepsEntity)
 
+    @Query("SELECT * FROM daily_steps ORDER BY date")
+    abstract suspend fun all(): List<DailyStepsEntity>
+
     @Transaction
     open suspend fun add(isoDate: String, delta: Int) {
         upsert(DailyStepsEntity(isoDate, (stepsOn(isoDate) ?: 0) + delta))
@@ -92,6 +98,9 @@ interface CustomExerciseDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(entity: CustomExerciseEntity)
+
+    @Query("SELECT * FROM custom_exercises ORDER BY name")
+    suspend fun allNow(): List<CustomExerciseEntity>
 }
 
 @Dao
@@ -134,6 +143,18 @@ interface WalkDao {
 
     @Query("DELETE FROM walks WHERE id = :id")
     suspend fun delete(id: Long)
+
+    @Query("SELECT * FROM walks WHERE endedAt IS NOT NULL ORDER BY startedAt")
+    suspend fun finishedNow(): List<WalkEntity>
+
+    @Query("SELECT * FROM walk_points WHERE walkId = :walkId ORDER BY time")
+    suspend fun pointsNow(walkId: Long): List<WalkPointEntity>
+
+    @Query("SELECT COUNT(*) FROM walks WHERE startedAt = :startedAt")
+    suspend fun countByStart(startedAt: Long): Int
+
+    @Insert
+    suspend fun insertPoints(points: List<WalkPointEntity>)
 }
 
 @Dao
@@ -145,5 +166,51 @@ interface MealDao {
     suspend fun insert(meal: MealEntity): Long
 
     @Query("DELETE FROM meals WHERE id = :id")
+    suspend fun delete(id: Long)
+
+    /** Derniers repas, pour la liste « Récents ». */
+    @Query("SELECT * FROM meals ORDER BY time DESC LIMIT 300")
+    fun latest(): Flow<List<MealEntity>>
+
+    @Query("SELECT * FROM meals ORDER BY time")
+    suspend fun all(): List<MealEntity>
+
+    @Query("SELECT COUNT(*) FROM meals WHERE time = :time AND name = :name")
+    suspend fun count(time: Long, name: String): Int
+}
+
+@Dao
+interface FavoriteMealDao {
+    @Query("SELECT * FROM favorite_meals ORDER BY name")
+    fun all(): Flow<List<FavoriteMealEntity>>
+
+    @Query("SELECT * FROM favorite_meals ORDER BY name")
+    suspend fun allNow(): List<FavoriteMealEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(entity: FavoriteMealEntity)
+
+    @Query("DELETE FROM favorite_meals WHERE name = :name")
+    suspend fun deleteByName(name: String)
+}
+
+@Dao
+interface TemplateDao {
+    @Query("SELECT * FROM workout_templates ORDER BY name")
+    fun all(): Flow<List<TemplateEntity>>
+
+    @Query("SELECT * FROM workout_templates ORDER BY name")
+    suspend fun allNow(): List<TemplateEntity>
+
+    @Query("SELECT * FROM workout_templates WHERE id = :id")
+    suspend fun get(id: Long): TemplateEntity?
+
+    @Query("SELECT COUNT(*) FROM workout_templates WHERE name = :name")
+    suspend fun countByName(name: String): Int
+
+    @Insert
+    suspend fun insert(entity: TemplateEntity): Long
+
+    @Query("DELETE FROM workout_templates WHERE id = :id")
     suspend fun delete(id: Long)
 }

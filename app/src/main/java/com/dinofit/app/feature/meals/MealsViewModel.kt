@@ -7,6 +7,7 @@ import com.dinofit.app.core.common.FitnessMath
 import com.dinofit.app.core.common.NutritionLabelParser
 import com.dinofit.app.core.data.NutritionRepository
 import com.dinofit.app.core.data.ProfileRepository
+import com.dinofit.app.core.model.FavoriteMeal
 import com.dinofit.app.core.model.Meal
 import com.dinofit.app.core.model.MealSource
 import com.dinofit.app.core.model.Nutrients
@@ -61,6 +62,10 @@ sealed interface MealsUiState {
         val targets: MacroTargets,
         val meals: List<Meal>,
         val apiKey: String,
+        val favorites: List<FavoriteMeal>,
+        /** Récents qui ne sont pas déjà en favoris. */
+        val recents: List<FavoriteMeal>,
+        val favoriteNames: Set<String>,
     ) : MealsUiState
 }
 
@@ -85,7 +90,9 @@ class MealsViewModel @Inject constructor(
         nutrition.kcalGoal,
         nutrition.claudeApiKey,
         profileRepository.profile,
-    ) { (day, meals), goal, key, profile ->
+        combine(nutrition.favorites, nutrition.recents) { f, r -> f to r },
+    ) { (day, meals), goal, key, profile, (favorites, recents) ->
+        val favNames = favorites.map { it.name.trim().lowercase() }.toSet()
         val protein = profile.weightKg * 1.6
         val fat = goal * 0.28 / 9
         MealsUiState.Success(
@@ -96,6 +103,9 @@ class MealsViewModel @Inject constructor(
             targets = MacroTargets(protein, ((goal - protein * 4 - fat * 9) / 4).coerceAtLeast(0.0), fat),
             meals = meals,
             apiKey = key,
+            favorites = favorites,
+            recents = recents.filter { it.name.trim().lowercase() !in favNames }.take(8),
+            favoriteNames = favNames,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MealsUiState.Loading)
 
@@ -192,6 +202,15 @@ class MealsViewModel @Inject constructor(
             nutrition.add(name, total, source)
             _scan.value = ScanState.Idle
         }
+    }
+
+    /** Ré-ajoute un favori ou un récent en un toucher. */
+    fun addAgain(meal: FavoriteMeal) {
+        viewModelScope.launch { nutrition.add(meal.name, meal.nutrients, MealSource.REPEAT) }
+    }
+
+    fun setFavorite(name: String, nutrients: Nutrients, favorite: Boolean) {
+        viewModelScope.launch { nutrition.setFavorite(name, nutrients, favorite) }
     }
 
     fun dismissScan() {

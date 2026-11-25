@@ -25,6 +25,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
+import com.dinofit.app.core.designsystem.PillButton
+import com.dinofit.app.core.designsystem.PillStyle
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -42,11 +50,40 @@ import kotlin.math.roundToInt
 @Composable
 fun ProfileRoute(viewModel: ProfileViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    ProfileScreen(uiState, viewModel::update)
+    val backupMessage by viewModel.backupMessage.collectAsStateWithLifecycle()
+    val update by viewModel.update.collectAsStateWithLifecycle()
+    val resolver = LocalContext.current.contentResolver
+    // Le sélecteur de fichiers d'Android : on peut choisir Google Drive, Téléchargements, etc.
+    val save = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri != null) viewModel.exportTo(uri, resolver)
+    }
+    val open = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) viewModel.importFrom(uri, resolver)
+    }
+    ProfileScreen(
+        uiState = uiState,
+        onUpdate = viewModel::update,
+        installedVersion = viewModel.installedVersion,
+        backupMessage = backupMessage,
+        update = update,
+        onExport = { save.launch("dinofit-${java.time.LocalDate.now()}.json") },
+        onImport = { open.launch(arrayOf("application/json", "text/plain", "application/octet-stream", "*/*")) },
+        onCheckUpdate = viewModel::checkUpdate,
+    )
 }
 
 @Composable
-internal fun ProfileScreen(uiState: ProfileUiState, onUpdate: (UserProfile) -> Unit) {
+internal fun ProfileScreen(
+    uiState: ProfileUiState,
+    onUpdate: (UserProfile) -> Unit,
+    installedVersion: String,
+    backupMessage: String?,
+    update: UpdateUi,
+    onExport: () -> Unit,
+    onImport: () -> Unit,
+    onCheckUpdate: () -> Unit,
+) {
+    val uri = LocalUriHandler.current
     val profile = (uiState as? ProfileUiState.Success)?.profile ?: return
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 20.dp),
@@ -95,11 +132,40 @@ internal fun ProfileScreen(uiState: ProfileUiState, onUpdate: (UserProfile) -> U
                 )
             }
         }
-        Panel(title = "Tes données") {
+        Panel(title = "Sauvegarde et transfert") {
             Text(
-                "Tes séances sont enregistrées sur ton téléphone à chaque modification. Le podomètre compte même app fermée ; DinoFit relève le compteur toutes les 15 minutes. " +
-                    "Faits sur les dinosaures : dinofacts.fyi, d'après Wikipédia.",
+                "Tout est enregistré sur ce téléphone. Fais une sauvegarde de temps en temps : si tu changes de téléphone, tu la restaures. " +
+                    "Le même fichier s'importe dans DinoFit sur PC (Profil > Importer une sauvegarde), et un fichier exporté du PC se restaure ici. " +
+                    "La restauration ajoute ce qui manque, sans rien effacer ni créer de doublons.",
                 style = DinoType.Small.copy(fontSize = DinoType.Body.fontSize.times(0.93f)), color = DinoColors.InkDim,
+            )
+            Spacer(Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PillButton("Sauvegarder", onClick = onExport, style = PillStyle.Primary)
+                PillButton("Restaurer", onClick = onImport)
+            }
+            backupMessage?.let { Text(it, style = DinoType.Small, color = DinoColors.Ink, modifier = Modifier.padding(top = 10.dp)) }
+        }
+
+        Panel(title = "Mises à jour") {
+            Text("Version installée : $installedVersion", style = DinoType.Body, color = DinoColors.Ink)
+            Spacer(Modifier.height(10.dp))
+            when (update) {
+                UpdateUi.Idle -> PillButton("Vérifier les mises à jour", onClick = onCheckUpdate)
+                UpdateUi.Checking -> Text("Vérification…", style = DinoType.Small, color = DinoColors.InkDim)
+                UpdateUi.UpToDate -> Text("Tu as la dernière version.", style = DinoType.Small, color = DinoColors.Green)
+                UpdateUi.Failed -> Column {
+                    Text("Impossible de vérifier (pas de connexion ?).", style = DinoType.Small, color = DinoColors.Lava)
+                    PillButton("Réessayer", onClick = onCheckUpdate, modifier = Modifier.padding(top = 8.dp))
+                }
+                is UpdateUi.Available -> Column {
+                    Text("Version ${update.update.versionName} disponible.", style = DinoType.BodyBold, color = DinoColors.Ink)
+                    PillButton("Télécharger", onClick = { uri.openUri(update.update.downloadUrl) }, style = PillStyle.Primary, modifier = Modifier.padding(top = 8.dp))
+                }
+            }
+            Text(
+                "Faits sur les dinosaures : dinofacts.fyi, d'après Wikipédia. Produits : Open Food Facts.",
+                style = DinoType.Label, color = DinoColors.InkFaint, modifier = Modifier.padding(top = 12.dp),
             )
         }
     }

@@ -36,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -132,6 +133,17 @@ internal fun HomeScreen(
         }
         streakMessage(state.streak)?.let {
             Text(it, style = DinoType.Small, color = if (state.streak.atRisk) DinoColors.Lava else DinoColors.InkDim, modifier = Modifier.offset(y = (-8).dp))
+        }
+        state.update?.let { upd ->
+            val uri = LocalUriHandler.current
+            Panel {
+                Text("Nouvelle version ${upd.versionName} disponible", style = DinoType.Title, color = DinoColors.Ink)
+                Text(
+                    "Touche « Télécharger », puis ouvre le fichier pour l'installer. Tes données sont gardées.",
+                    style = DinoType.Small, color = DinoColors.InkDim, modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
+                )
+                PillButton("Télécharger la mise à jour", onClick = { uri.openUri(upd.downloadUrl) }, style = PillStyle.Primary)
+            }
         }
         RankHero(state.tonnageKg, state.rank, state.nextRank, state.progress, onClick = onOpenRanks)
 

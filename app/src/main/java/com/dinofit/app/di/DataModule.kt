@@ -16,6 +16,9 @@ import com.dinofit.app.core.database.CustomExerciseDao
 import com.dinofit.app.core.database.DinoFitDatabase
 import com.dinofit.app.core.database.MIGRATION_1_2
 import com.dinofit.app.core.database.MIGRATION_2_3
+import com.dinofit.app.core.database.MIGRATION_3_4
+import com.dinofit.app.core.database.FavoriteMealDao
+import com.dinofit.app.core.database.TemplateDao
 import com.dinofit.app.core.database.MealDao
 import com.dinofit.app.core.data.NutritionRepository
 import com.dinofit.app.core.data.OfflineFirstNutritionRepository
@@ -39,7 +42,7 @@ object DatabaseModule {
     @Singleton
     fun database(@ApplicationContext context: Context): DinoFitDatabase =
         Room.databaseBuilder(context, DinoFitDatabase::class.java, "dinofit.db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
             .build()
 
     @Provides fun workoutDao(db: DinoFitDatabase): WorkoutDao = db.workoutDao()
@@ -47,6 +50,8 @@ object DatabaseModule {
     @Provides fun customExerciseDao(db: DinoFitDatabase): CustomExerciseDao = db.customExerciseDao()
     @Provides fun walkDao(db: DinoFitDatabase): WalkDao = db.walkDao()
     @Provides fun mealDao(db: DinoFitDatabase): MealDao = db.mealDao()
+    @Provides fun favoriteMealDao(db: DinoFitDatabase): FavoriteMealDao = db.favoriteMealDao()
+    @Provides fun templateDao(db: DinoFitDatabase): TemplateDao = db.templateDao()
 
     @Provides
     @Singleton

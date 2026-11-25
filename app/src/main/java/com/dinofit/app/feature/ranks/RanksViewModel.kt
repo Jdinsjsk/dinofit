@@ -8,6 +8,7 @@ import com.dinofit.app.core.data.WorkoutRepository
 import com.dinofit.app.core.model.DinoRank
 import com.dinofit.app.core.model.DinoRanks
 import com.dinofit.app.core.model.PersonalRecord
+import com.dinofit.app.core.model.ProgressPoint
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -26,6 +27,8 @@ sealed interface RanksUiState {
         val sessions: Int,
         val sets: Int,
         val gymKcal: Int,
+        /** Courbe de chaque exercice des records (max estimé par séance). */
+        val progressions: Map<String, List<ProgressPoint>>,
     ) : RanksUiState
 }
 
@@ -39,14 +42,16 @@ class RanksViewModel @Inject constructor(
         profileRepository.profile,
     ) { sessions, profile ->
         val tonnage = FitnessMath.totalTonnage(sessions, profile)
+        val records = FitnessMath.records(sessions, profile)
         RanksUiState.Success(
             tonnageKg = tonnage,
             currentLevel = FitnessMath.rankFor(tonnage).level,
             ranks = DinoRanks,
-            records = FitnessMath.records(sessions, profile).take(8),
+            records = records,
             sessions = sessions.size,
             sets = sessions.sumOf { FitnessMath.sessionSets(it) },
             gymKcal = sessions.sumOf { FitnessMath.sessionKcal(it, profile) }.roundToInt(),
+            progressions = records.associate { it.exercise.id to FitnessMath.progression(sessions, it.exercise.id, profile) },
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RanksUiState.Loading)
 }

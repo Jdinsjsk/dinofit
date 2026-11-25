@@ -11,6 +11,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -44,6 +46,9 @@ data class SessionSummary(
     val kcal: String,
     val duration: String,
     val lines: List<ExerciseLines>,
+    val exerciseIds: List<String>,
+    /** Nom proposé pour un modèle : les groupes musculaires de la séance. */
+    val suggestedName: String,
 )
 
 fun WorkoutSession.toSummary(profile: UserProfile): SessionSummary {
@@ -61,6 +66,8 @@ fun WorkoutSession.toSummary(profile: UserProfile): SessionSummary {
         tonnage = Formats.tonnage(FitnessMath.sessionTonnage(this, profile)),
         kcal = kcal,
         duration = Formats.duration(durationMin),
+        exerciseIds = entries.map { it.exercise.id },
+        suggestedName = entries.map { it.exercise.group.label }.distinct().take(3).joinToString(" + "),
         lines = entries.map { e ->
             ExerciseLines(
                 name = e.exercise.name,
@@ -79,7 +86,12 @@ fun WorkoutSession.toSummary(profile: UserProfile): SessionSummary {
 
 /** Liste de séances ; un appui ouvre le détail (exercices, séries) avec suppression possible. */
 @Composable
-fun SessionRows(sessions: List<SessionSummary>, emptyText: String, onDelete: (Long) -> Unit) {
+fun SessionRows(
+    sessions: List<SessionSummary>,
+    emptyText: String,
+    onDelete: (Long) -> Unit,
+    onMakeTemplate: ((String, List<String>) -> Unit)? = null,
+) {
     var opened by remember { mutableStateOf<SessionSummary?>(null) }
     if (sessions.isEmpty()) {
         Text(emptyText, style = DinoType.Body, color = DinoColors.InkDim)
@@ -101,13 +113,28 @@ fun SessionRows(sessions: List<SessionSummary>, emptyText: String, onDelete: (Lo
         }
     }
     opened?.let { s ->
-        SessionDetailDialog(s, onDismiss = { opened = null }, onDelete = { onDelete(s.id); opened = null })
+        SessionDetailDialog(
+            s,
+            onDismiss = { opened = null },
+            onDelete = { onDelete(s.id); opened = null },
+            onMakeTemplate = onMakeTemplate?.let { make -> { name: String -> make(name, s.exerciseIds); opened = null } },
+        )
     }
 }
 
 @Composable
-fun SessionDetailDialog(s: SessionSummary, onDismiss: () -> Unit, onDelete: () -> Unit) {
+fun SessionDetailDialog(
+    s: SessionSummary,
+    onDismiss: () -> Unit,
+    onDelete: () -> Unit,
+    onMakeTemplate: ((String) -> Unit)? = null,
+) {
     var confirm by remember { mutableStateOf(false) }
+    var naming by remember { mutableStateOf(false) }
+    if (naming && onMakeTemplate != null) {
+        TemplateNameDialog(s.suggestedName, onConfirm = onMakeTemplate, onDismiss = { naming = false })
+        return
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = DinoColors.Bg,
@@ -118,6 +145,9 @@ fun SessionDetailDialog(s: SessionSummary, onDismiss: () -> Unit, onDelete: () -
                     StatTile("Tonnage", s.tonnage, Modifier.weight(1f), DinoColors.AmberInk)
                     StatTile("Calories", s.kcal, Modifier.weight(1f), DinoColors.Lava)
                     StatTile("Durée", s.duration, Modifier.weight(1f))
+                }
+                if (onMakeTemplate != null) {
+                    PillButton("En faire une séance modèle", onClick = { naming = true }, style = PillStyle.Ghost, modifier = Modifier.padding(bottom = 8.dp))
                 }
                 s.lines.forEach { ex ->
                     HorizontalDivider(color = DinoColors.Line)
@@ -133,5 +163,29 @@ fun SessionDetailDialog(s: SessionSummary, onDismiss: () -> Unit, onDelete: () -
                 Text(if (confirm) "Confirmer la suppression" else "Supprimer", color = DinoColors.Lava)
             }
         },
+    )
+}
+
+/** Donner un nom à une séance modèle (ex. « Push », « Jambes »). */
+@Composable
+fun TemplateNameDialog(suggested: String, onConfirm: (String) -> Unit, onDismiss: () -> Unit) {
+    var name by remember { mutableStateOf(suggested) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = DinoColors.Bg,
+        title = { Text("Nouvelle séance modèle", style = DinoType.Title) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Elle reprendra ces exercices, avec tes derniers poids préremplis.", style = DinoType.Small, color = DinoColors.InkDim)
+                OutlinedTextField(
+                    value = name, onValueChange = { name = it.take(40) },
+                    label = { Text("Nom (ex. Push, Jambes)") }, singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = DinoColors.Amber, cursorColor = DinoColors.Amber),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = { PillButton("Enregistrer", onClick = { onConfirm(name.trim()) }, style = PillStyle.Primary, enabled = name.isNotBlank()) },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Annuler") } },
     )
 }

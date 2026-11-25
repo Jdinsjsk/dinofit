@@ -39,7 +39,7 @@ data class ActiveEntry(
 
 sealed interface WorkoutUiState {
     data object Loading : WorkoutUiState
-    data class Idle(val history: List<SessionSummary>, val streak: Streak) : WorkoutUiState
+    data class Idle(val history: List<SessionSummary>, val streak: Streak, val templates: List<TemplateUi>) : WorkoutUiState
     data class Active(
         val sessionId: Long,
         val startedAt: Long,
@@ -49,7 +49,10 @@ sealed interface WorkoutUiState {
     ) : WorkoutUiState
 }
 
+data class TemplateUi(val id: Long, val name: String, val summary: String)
+
 sealed interface WorkoutEvent {
+    data class Message(val text: String) : WorkoutEvent
     data class RankUp(val rank: DinoRank) : WorkoutEvent
     data class Saved(val tonnage: String, val kcal: String, val duration: String, val streak: Int) : WorkoutEvent
     data object NothingToSave : WorkoutEvent
@@ -65,6 +68,9 @@ sealed interface WorkoutAction {
     data object Finish : WorkoutAction
     data object Discard : WorkoutAction
     data class DeleteSession(val sessionId: Long) : WorkoutAction
+    data class StartTemplate(val templateId: Long) : WorkoutAction
+    data class SaveTemplate(val name: String, val exerciseIds: List<String>) : WorkoutAction
+    data class DeleteTemplate(val templateId: Long) : WorkoutAction
 }
 
 @HiltViewModel
@@ -83,9 +89,17 @@ class WorkoutViewModel @Inject constructor(
         workoutRepository.activeSession,
         workoutRepository.finishedSessions,
         profileRepository.profile,
-    ) { active, history, profile ->
+        combine(workoutRepository.templates, workoutRepository.exercises) { t, ex -> t to ex.associateBy { it.id } },
+    ) { active, history, profile, (templates, exercises) ->
         if (active == null) {
-            WorkoutUiState.Idle(history.map { it.toSummary(profile) }, streakOf(history))
+            WorkoutUiState.Idle(
+                history.map { it.toSummary(profile) },
+                streakOf(history),
+                templates.map { t ->
+                    val names = t.exerciseIds.map { exercises[it]?.name ?: it }
+                    TemplateUi(t.id, t.name, "${names.size} exercice${if (names.size > 1) "s" else ""} : ${names.joinToString(", ")}")
+                },
+            )
         } else {
             WorkoutUiState.Active(
                 sessionId = active.id,
@@ -130,6 +144,14 @@ class WorkoutViewModel @Inject constructor(
                 is WorkoutAction.RemoveExercise -> active?.let { workoutRepository.removeExercise(it.sessionId, action.exerciseOrder) }
                 WorkoutAction.Discard -> active?.let { workoutRepository.discardSession(it.sessionId) }
                 is WorkoutAction.DeleteSession -> workoutRepository.deleteSession(action.sessionId)
+                is WorkoutAction.StartTemplate -> if (active == null) workoutRepository.startFromTemplate(action.templateId)
+                is WorkoutAction.SaveTemplate -> _events.send(
+                    WorkoutEvent.Message(
+                        if (workoutRepository.saveTemplate(action.name, action.exerciseIds)) "Séance modèle « ${action.name} » enregistrée"
+                        else "Un modèle porte déjà ce nom",
+                    ),
+                )
+                is WorkoutAction.DeleteTemplate -> workoutRepository.deleteTemplate(action.templateId)
                 WorkoutAction.Finish -> active?.let { finish(it.sessionId) }
             }
         }

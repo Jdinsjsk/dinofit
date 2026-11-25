@@ -182,3 +182,21 @@ class StreakAndLabelTest {
         assertTrue(!none.isUseful)
     }
 }
+
+class ProgressionTest {
+    private val p = com.dinofit.app.core.model.UserProfile(weightKg = 80.0)
+    private val bench = com.dinofit.app.core.model.ExerciseCatalog.first { it.id == "bench" }
+    private fun s(t: Long, vararg sets: Pair<Double, Int>) = com.dinofit.app.core.model.WorkoutSession(
+        t, t, 60, true,
+        listOf(com.dinofit.app.core.model.ExerciseEntry(bench, 0, sets.map { com.dinofit.app.core.model.WorkoutSet(weightKg = it.first, reps = it.second) })),
+    )
+
+    @Test fun progression_is_chronological_best_per_session() {
+        val pts = FitnessMath.progression(listOf(s(300, 80.0 to 8), s(100, 60.0 to 10, 70.0 to 5), s(200, 75.0 to 6)), "bench", p)
+        assertEquals(listOf(100L, 200L, 300L), pts.map { it.time })
+        assertEquals(81.67, pts[0].estimatedMaxKg, 0.01)     // max(60 × 1,333 = 80 ; 70 × 1,1667 = 81,67)
+        assertEquals(90.0, pts[1].estimatedMaxKg, 0.01)      // 75 × 1,2
+        assertEquals(101.33, pts[2].estimatedMaxKg, 0.01)    // 80 × 1,2667
+        assertTrue(FitnessMath.progression(listOf(s(1, 50.0 to 5)), "squat", p).isEmpty())
+    }
+}

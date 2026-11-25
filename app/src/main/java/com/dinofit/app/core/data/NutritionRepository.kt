@@ -1,7 +1,10 @@
 package com.dinofit.app.core.data
 
 import com.dinofit.app.core.common.FitnessMath
+import com.dinofit.app.core.database.FavoriteMealDao
+import com.dinofit.app.core.database.FavoriteMealEntity
 import com.dinofit.app.core.database.MealDao
+import com.dinofit.app.core.model.FavoriteMeal
 import com.dinofit.app.core.database.MealEntity
 import com.dinofit.app.core.datastore.DinoFitPreferences
 import com.dinofit.app.core.model.Meal
@@ -30,13 +33,39 @@ interface NutritionRepository {
     suspend fun setClaudeApiKey(value: String)
     suspend fun add(name: String, nutrients: Nutrients, source: MealSource)
     suspend fun delete(id: Long)
+
+    val favorites: Flow<List<FavoriteMeal>>
+    /** Repas des 30 derniers jours, du plus récent au plus ancien, sans doublon de nom. */
+    val recents: Flow<List<FavoriteMeal>>
+    suspend fun setFavorite(name: String, nutrients: Nutrients, favorite: Boolean)
 }
 
 @Singleton
 internal class OfflineFirstNutritionRepository @Inject constructor(
     private val dao: MealDao,
+    private val favoriteDao: FavoriteMealDao,
     private val prefs: DinoFitPreferences,
 ) : NutritionRepository {
+
+    override val favorites: Flow<List<FavoriteMeal>> = favoriteDao.all().map { rows ->
+        rows.map { FavoriteMeal(it.id, it.name, Nutrients(it.kcal, it.protein, it.carbs, it.fat)) }
+    }
+
+    override val recents: Flow<List<FavoriteMeal>> = dao.latest().map { rows ->
+        val since = System.currentTimeMillis() - 30L * 24 * 3600 * 1000
+        rows.filter { it.time >= since }
+            .distinctBy { it.name.trim().lowercase() }
+            .take(12)
+            .map { FavoriteMeal(it.id, it.name, Nutrients(it.kcal, it.protein, it.carbs, it.fat)) }
+    }
+
+    override suspend fun setFavorite(name: String, nutrients: Nutrients, favorite: Boolean) {
+        if (favorite) {
+            favoriteDao.upsert(FavoriteMealEntity(name = name.trim(), kcal = nutrients.kcal, protein = nutrients.protein, carbs = nutrients.carbs, fat = nutrients.fat))
+        } else {
+            favoriteDao.deleteByName(name.trim())
+        }
+    }
 
     override val today: Flow<LocalDate> = flow {
         while (true) {

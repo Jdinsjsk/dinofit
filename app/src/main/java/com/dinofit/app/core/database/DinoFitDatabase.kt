@@ -9,8 +9,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     entities = [
         SessionEntity::class, SetEntity::class, DailyStepsEntity::class, CustomExerciseEntity::class,
         WalkEntity::class, WalkPointEntity::class, MealEntity::class,
+        FavoriteMealEntity::class, TemplateEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 abstract class DinoFitDatabase : RoomDatabase() {
@@ -19,6 +20,8 @@ abstract class DinoFitDatabase : RoomDatabase() {
     abstract fun customExerciseDao(): CustomExerciseDao
     abstract fun walkDao(): WalkDao
     abstract fun mealDao(): MealDao
+    abstract fun favoriteMealDao(): FavoriteMealDao
+    abstract fun templateDao(): TemplateDao
 }
 
 /** v1 → v2 : ajoute les marches GPS sans toucher aux séances déjà enregistrées. */
@@ -46,5 +49,20 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
                 "`carbs` REAL NOT NULL, `fat` REAL NOT NULL, `source` TEXT NOT NULL)",
         )
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_meals_date` ON `meals` (`date`)")
+    }
+}
+
+/** v3 → v4 : repas favoris et séances modèles. */
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `favorite_meals` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, " +
+                "`kcal` REAL NOT NULL, `protein` REAL NOT NULL, `carbs` REAL NOT NULL, `fat` REAL NOT NULL)",
+        )
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_favorite_meals_name` ON `favorite_meals` (`name`)")
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `workout_templates` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "`name` TEXT NOT NULL, `exerciseIds` TEXT NOT NULL)",
+        )
     }
 }

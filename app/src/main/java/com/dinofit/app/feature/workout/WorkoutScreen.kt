@@ -74,6 +74,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dinofit.app.core.common.Formats
@@ -103,6 +104,13 @@ fun WorkoutRoute(viewModel: WorkoutViewModel = hiltViewModel()) {
     when (val e = event) {
         is WorkoutEvent.RankUp -> RankUpDialog(e.rank, onDismiss = { event = null })
         is WorkoutEvent.Saved -> SavedDialog(e, onDismiss = { event = null })
+        is WorkoutEvent.Message -> {
+            val context = androidx.compose.ui.platform.LocalContext.current
+            LaunchedEffect(e) {
+                android.widget.Toast.makeText(context, e.text, android.widget.Toast.LENGTH_SHORT).show()
+                event = null
+            }
+        }
         WorkoutEvent.NothingToSave -> AlertDialog(
             onDismissRequest = { event = null },
             confirmButton = { TextButton(onClick = { event = null }) { Text("OK") } },
@@ -133,6 +141,7 @@ internal fun WorkoutScreen(
             state,
             onStart = { onAction(WorkoutAction.Start); showPicker = true },
             onDelete = { onAction(WorkoutAction.DeleteSession(it)) },
+            onAction = onAction,
         )
         is WorkoutUiState.Active -> ActiveContent(state, onAction, onOpenPicker = { showPicker = true })
     }
@@ -148,7 +157,8 @@ internal fun WorkoutScreen(
 }
 
 @Composable
-private fun IdleContent(state: WorkoutUiState.Idle, onStart: () -> Unit, onDelete: (Long) -> Unit) {
+private fun IdleContent(state: WorkoutUiState.Idle, onStart: () -> Unit, onDelete: (Long) -> Unit, onAction: (WorkoutAction) -> Unit) {
+    var templateToDelete by remember { mutableStateOf<TemplateUi?>(null) }
     var showAll by remember { mutableStateOf(false) }
     val n = state.history.size
     Column(
@@ -171,6 +181,30 @@ private fun IdleContent(state: WorkoutUiState.Idle, onStart: () -> Unit, onDelet
             )
             PillButton("Commencer une séance", onClick = onStart, style = PillStyle.Primary, big = true, modifier = Modifier.fillMaxWidth())
         }
+        Panel(title = "Séances modèles") {
+            if (state.templates.isEmpty()) {
+                Text(
+                    "Lance tes séances habituelles en un toucher. Dans l'historique, ouvre une séance puis « En faire une séance modèle ».",
+                    style = DinoType.Small.copy(fontSize = DinoType.Body.fontSize.times(0.93f)), color = DinoColors.InkDim,
+                )
+            }
+            state.templates.forEachIndexed { i, t ->
+                if (i > 0) HorizontalDivider(color = DinoColors.Line)
+                Row(
+                    Modifier.fillMaxWidth().pressClickable(onClickLabel = "Démarrer ${t.name}") { onAction(WorkoutAction.StartTemplate(t.id)) }.padding(vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(t.name, style = DinoType.BodyBold, color = DinoColors.Ink)
+                        Text(t.summary, style = DinoType.Small, color = DinoColors.InkDim, maxLines = 2)
+                    }
+                    Text("Démarrer", style = DinoType.BodyBold.copy(fontSize = 14.sp), color = DinoColors.AmberInk)
+                    IconButton(onClick = { templateToDelete = t }) {
+                        Icon(NavIcons.Close, contentDescription = "Supprimer le modèle ${t.name}", tint = DinoColors.InkFaint, modifier = Modifier.size(16.dp))
+                    }
+                }
+            }
+        }
         Panel(title = "Comment le rang est calculé", outlined = true) {
             Text(
                 "Pour chaque série : poids × répétitions. Pour les exercices au poids du corps (tractions, dips, pompes…), ton poids s'ajoute au lest. " +
@@ -183,12 +217,28 @@ private fun IdleContent(state: WorkoutUiState.Idle, onStart: () -> Unit, onDelet
                 if (showAll) state.history else state.history.take(6),
                 "Ton historique apparaîtra ici après ta première séance. Appuie sur une séance pour voir son détail.",
                 onDelete = onDelete,
+                onMakeTemplate = { name, ids -> onAction(WorkoutAction.SaveTemplate(name, ids)) },
             )
             if (!showAll && n > 6) {
                 DashedButton("Voir les ${n - 6} séances précédentes") { showAll = true }
             }
         }
     }
+    templateToDelete?.let { t ->
+        TemplateDeleteDialog(t, onConfirm = { onAction(WorkoutAction.DeleteTemplate(t.id)); templateToDelete = null }, onDismiss = { templateToDelete = null })
+    }
+}
+
+@Composable
+private fun TemplateDeleteDialog(t: TemplateUi, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = DinoColors.Bg,
+        title = { Text("Supprimer « ${t.name} » ?") },
+        text = { Text("Seul le modèle est supprimé, pas tes séances.") },
+        confirmButton = { TextButton(onClick = onConfirm) { Text("Supprimer", color = DinoColors.Lava) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Garder") } },
+    )
 }
 
 @Composable

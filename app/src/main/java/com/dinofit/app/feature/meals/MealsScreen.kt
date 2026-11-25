@@ -61,7 +61,9 @@ import com.dinofit.app.core.designsystem.PillStyle
 import com.dinofit.app.core.designsystem.ProgressBar
 import com.dinofit.app.core.designsystem.pressClickable
 import com.dinofit.app.core.designsystem.strokeIcon
+import com.dinofit.app.core.model.FavoriteMeal
 import com.dinofit.app.core.model.Meal
+import com.dinofit.app.core.designsystem.StarIcons
 import com.dinofit.app.core.model.MealSource
 import com.dinofit.app.core.model.Nutrients
 import com.google.mlkit.vision.barcode.common.Barcode
@@ -120,6 +122,11 @@ fun MealsRoute(viewModel: MealsViewModel = hiltViewModel()) {
         onDelete = viewModel::delete,
         onSetGoal = viewModel::setGoal,
         onSetApiKey = viewModel::setApiKey,
+        onAddAgain = { m ->
+            viewModel.addAgain(m)
+            android.widget.Toast.makeText(context, "Ajouté : ${m.name} (${m.nutrients.kcal.roundToInt()} kcal)", android.widget.Toast.LENGTH_SHORT).show()
+        },
+        onSetFavorite = viewModel::setFavorite,
     )
 }
 
@@ -136,6 +143,8 @@ internal fun MealsScreen(
     onDelete: (Long) -> Unit,
     onSetGoal: (Int) -> Unit,
     onSetApiKey: (String) -> Unit,
+    onAddAgain: (FavoriteMeal) -> Unit,
+    onSetFavorite: (String, Nutrients, Boolean) -> Unit,
 ) {
     val state = uiState as? MealsUiState.Success ?: return
     var showSettings by remember { mutableStateOf(false) }
@@ -165,6 +174,16 @@ internal fun MealsScreen(
             MacroRow("Protéines", state.eaten.protein, state.targets.protein, DinoColors.Green)
             MacroRow("Glucides", state.eaten.carbs, state.targets.carbs, DinoColors.Amber)
             MacroRow("Lipides", state.eaten.fat, state.targets.fat, Color(0xFF6C8EBF))
+        }
+
+        if (state.favorites.isNotEmpty() || state.recents.isNotEmpty()) {
+            Panel(title = "En un toucher") {
+                Text("Tes favoris, puis ce que tu as mangé ces 30 derniers jours. L'étoile ajoute ou retire des favoris.", style = DinoType.Small, color = DinoColors.InkDim)
+                (state.favorites.map { it to true } + state.recents.map { it to false }).forEachIndexed { i, (m, fav) ->
+                    if (i > 0) HorizontalDivider(color = DinoColors.Line)
+                    QuickRow(m, fav, onAdd = { onAddAgain(m) }, onStar = { onSetFavorite(m.name, m.nutrients, !fav) })
+                }
+            }
         }
 
         Panel(title = "Ajouter ce que tu manges") {
@@ -228,10 +247,39 @@ internal fun MealsScreen(
             onDismissRequest = { toDelete = null },
             containerColor = DinoColors.Bg,
             title = { Text(m.name, style = DinoType.Title) },
-            text = { Text("${Formats.int(m.nutrients.kcal.roundToInt())} kcal, ajouté par ${m.source.label.lowercase()}.", style = DinoType.Body) },
+            text = {
+                val isFav = m.name.trim().lowercase() in state.favoriteNames
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("${Formats.int(m.nutrients.kcal.roundToInt())} kcal, ajouté par ${m.source.label.lowercase()}.", style = DinoType.Body)
+                    PillButton(
+                        if (isFav) "Retirer des favoris" else "Ajouter aux favoris",
+                        onClick = { onSetFavorite(m.name, m.nutrients, !isFav); toDelete = null },
+                        style = PillStyle.Ghost,
+                    )
+                }
+            },
             confirmButton = { PillButton("Garder", onClick = { toDelete = null }, style = PillStyle.Primary) },
             dismissButton = { TextButton(onClick = { onDelete(m.id); toDelete = null }) { Text("Supprimer", color = DinoColors.Lava) } },
         )
+    }
+}
+
+@Composable
+private fun QuickRow(m: FavoriteMeal, favorite: Boolean, onAdd: () -> Unit, onStar: () -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        IconButton(onClick = onStar) {
+            Icon(
+                if (favorite) StarIcons.Filled else StarIcons.Outline,
+                contentDescription = if (favorite) "Retirer ${m.name} des favoris" else "Mettre ${m.name} en favori",
+                tint = if (favorite) DinoColors.Amber else DinoColors.InkFaint,
+                modifier = Modifier.size(22.dp),
+            )
+        }
+        Column(Modifier.weight(1f)) {
+            Text(m.name, style = DinoType.BodyBold, color = DinoColors.Ink, maxLines = 1)
+            Text("${Formats.int(m.nutrients.kcal.roundToInt())} kcal, P ${m.nutrients.protein.roundToInt()} g", style = DinoType.Small, color = DinoColors.InkDim)
+        }
+        PillButton("Ajouter", onClick = onAdd, style = PillStyle.Secondary)
     }
 }
 

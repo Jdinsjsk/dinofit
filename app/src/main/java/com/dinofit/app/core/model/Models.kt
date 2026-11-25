@@ -106,6 +106,7 @@ enum class MealSource(val label: String) {
     LABEL("Étiquette"),
     PHOTO_AI("Photo analysée par Claude"),
     MANUAL("Saisie manuelle"),
+    REPEAT("Favori ou récent"),
 }
 
 data class Meal(
@@ -116,3 +117,11 @@ data class Meal(
     val nutrients: Nutrients,
     val source: MealSource,
 )
+
+/** Séance modèle : liste d'exercices à relancer en un toucher (les derniers poids sont repris). */
+data class WorkoutTemplate(val id: Long, val name: String, val exerciseIds: List<String>)
+
+data class FavoriteMeal(val id: Long, val name: String, val nutrients: Nutrients)
+
+/** Un point de la courbe de progression : date de la séance et max estimé sur une répétition. */
+data class ProgressPoint(val time: Long, val estimatedMaxKg: Double)

@@ -9,6 +9,8 @@ import com.dinofit.app.core.data.StepsRepository
 import com.dinofit.app.core.data.NutritionRepository
 import com.dinofit.app.core.data.WorkoutRepository
 import com.dinofit.app.core.model.Streak
+import com.dinofit.app.core.network.AppUpdate
+import com.dinofit.app.core.network.UpdateChecker
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flatMapLatest
 import com.dinofit.app.core.model.DaySteps
@@ -51,6 +53,7 @@ sealed interface HomeUiState {
         val streak: Streak,
         val eatenKcal: Int,
         val kcalGoal: Int,
+        val update: AppUpdate?,
     ) : HomeUiState
 }
 
@@ -68,7 +71,17 @@ class HomeViewModel @Inject constructor(
     private val workoutRepository: WorkoutRepository,
     profileRepository: ProfileRepository,
     nutrition: NutritionRepository,
+    updateChecker: UpdateChecker,
 ) : ViewModel() {
+
+    // Nouvelle version sur GitHub ? Vérifié une fois à l'ouverture.
+    private val update = MutableStateFlow<AppUpdate?>(null)
+
+    init {
+        viewModelScope.launch {
+            (updateChecker.check() as? UpdateChecker.Result.Available)?.let { update.value = it.update }
+        }
+    }
 
     private val counting = MutableStateFlow(false)
     private var countingJob: Job? = null
@@ -79,7 +92,7 @@ class HomeViewModel @Inject constructor(
         nutrition.kcalGoal,
     ) { meals, goal -> meals.sumOf { it.nutrients.kcal }.roundToInt() to goal }
 
-    private val extras = combine(counting, eatenToday) { c, e -> c to e }
+    private val extras = combine(counting, eatenToday, update) { c, e, u -> Triple(c, e, u) }
 
     val uiState: StateFlow<HomeUiState> = combine(
         profileRepository.profile,
@@ -87,7 +100,7 @@ class HomeViewModel @Inject constructor(
         workoutRepository.finishedSessions,
         workoutRepository.activeSession,
         extras,
-    ) { profile, week, sessions, active, (isCounting, eaten) ->
+    ) { profile, week, sessions, active, (isCounting, eaten, available) ->
         val today = LocalDate.now()
         val todaySteps = week.lastOrNull()?.steps ?: 0
         val tonnage = FitnessMath.totalTonnage(sessions, profile)
@@ -119,6 +132,7 @@ class HomeViewModel @Inject constructor(
             ),
             eatenKcal = eaten.first,
             kcalGoal = eaten.second,
+            update = available,
         )
     }.stateIn(
         scope = viewModelScope,

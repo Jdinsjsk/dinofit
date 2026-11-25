@@ -5,6 +5,7 @@ import com.dinofit.app.core.model.DinoRanks
 import com.dinofit.app.core.model.Exercise
 import com.dinofit.app.core.model.LatLng
 import com.dinofit.app.core.model.PersonalRecord
+import com.dinofit.app.core.model.ProgressPoint
 import com.dinofit.app.core.model.Sex
 import com.dinofit.app.core.model.Streak
 import java.time.LocalDate
@@ -151,6 +152,15 @@ object FitnessMath {
 
     /** Calories d'une marche, estimées à partir de la distance (même base que les pas). */
     fun walkKcal(distanceM: Double, p: UserProfile): Double = stepsKcal((distanceM / strideMeters(p)).toInt(), p)
+
+    /** Max estimé (Epley) de chaque séance contenant l'exercice, du plus ancien au plus récent. */
+    fun progression(sessions: List<WorkoutSession>, exerciseId: String, p: UserProfile): List<ProgressPoint> =
+        sessions.sortedBy { it.startedAt }.mapNotNull { s ->
+            val entry = s.entries.firstOrNull { it.exercise.id == exerciseId } ?: return@mapNotNull null
+            val best = entry.sets.filter { it.reps > 0 }
+                .maxOfOrNull { estimatedOneRepMax(setLoad(entry.exercise, it, p), it.reps) } ?: return@mapNotNull null
+            ProgressPoint(s.startedAt, best)
+        }
 
     /**
      * Le capteur Android renvoie un total de pas depuis le dernier redémarrage.

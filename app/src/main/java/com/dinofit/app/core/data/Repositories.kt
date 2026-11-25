@@ -7,6 +7,9 @@ import com.dinofit.app.core.database.SessionEntity
 import com.dinofit.app.core.database.SessionWithSets
 import com.dinofit.app.core.database.SetEntity
 import com.dinofit.app.core.database.StepsDao
+import com.dinofit.app.core.database.TemplateDao
+import com.dinofit.app.core.database.TemplateEntity
+import com.dinofit.app.core.model.WorkoutTemplate
 import com.dinofit.app.core.database.WorkoutDao
 import com.dinofit.app.core.datastore.DinoFitPreferences
 import com.dinofit.app.core.model.DaySteps
@@ -108,13 +111,41 @@ interface WorkoutRepository {
     suspend fun deleteSession(sessionId: Long)
     suspend fun createCustomExercise(name: String, group: MuscleGroup): String
     suspend fun lastPerformance(exerciseId: String): List<WorkoutSet>
+
+    val templates: Flow<List<WorkoutTemplate>>
+    /** Enregistre un modèle ; renvoie false si le nom existe déjà. */
+    suspend fun saveTemplate(name: String, exerciseIds: List<String>): Boolean
+    suspend fun deleteTemplate(id: Long)
+    /** Démarre une séance avec les exercices du modèle, poids de la dernière fois préremplis. */
+    suspend fun startFromTemplate(id: Long)
 }
 
 @Singleton
 internal class OfflineFirstWorkoutRepository @Inject constructor(
     private val workoutDao: WorkoutDao,
     private val customDao: CustomExerciseDao,
+    private val templateDao: TemplateDao,
 ) : WorkoutRepository {
+
+    override val templates: Flow<List<WorkoutTemplate>> = templateDao.all().map { rows ->
+        rows.map { WorkoutTemplate(it.id, it.name, it.exerciseIds.split(',').filter(String::isNotBlank)) }
+    }
+
+    override suspend fun saveTemplate(name: String, exerciseIds: List<String>): Boolean {
+        val clean = name.trim()
+        if (clean.isEmpty() || exerciseIds.isEmpty() || templateDao.countByName(clean) > 0) return false
+        templateDao.insert(TemplateEntity(name = clean, exerciseIds = exerciseIds.joinToString(",")))
+        return true
+    }
+
+    override suspend fun deleteTemplate(id: Long) = templateDao.delete(id)
+
+    override suspend fun startFromTemplate(id: Long) {
+        val template = templateDao.get(id) ?: return
+        if (workoutDao.activeSession().first() != null) return
+        val sessionId = startSession()
+        template.exerciseIds.split(',').filter(String::isNotBlank).forEach { addExercise(sessionId, it) }
+    }
 
     override val exercises: Flow<List<Exercise>> = customDao.all().map { custom ->
         ExerciseCatalog + custom.map { it.toModel() }

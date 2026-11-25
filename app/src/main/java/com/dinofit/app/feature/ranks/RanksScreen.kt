@@ -51,6 +51,9 @@ import com.dinofit.app.core.designsystem.StatTile
 import com.dinofit.app.core.designsystem.pressClickable
 import com.dinofit.app.core.designsystem.riseIn
 import com.dinofit.app.core.model.DinoRank
+import com.dinofit.app.core.model.PersonalRecord
+import com.dinofit.app.core.designsystem.ProgressChart
+import com.dinofit.app.core.designsystem.progressSummary
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
@@ -67,6 +70,8 @@ internal fun RanksScreen(uiState: RanksUiState) {
     val next = state.ranks.getOrNull(state.currentLevel)
     val progress = FitnessMath.progressToNext(state.tonnageKg)
     var opened by remember { mutableStateOf<DinoRank?>(null) }
+    var chartFor by remember { mutableStateOf<PersonalRecord?>(null) }
+    var showAllRecords by remember { mutableStateOf(false) }
 
     // Le tonnage défile de 0 jusqu'à la vraie valeur.
     var countTarget by remember { mutableStateOf(0f) }
@@ -111,14 +116,21 @@ internal fun RanksScreen(uiState: RanksUiState) {
             Rung(rank, state.currentLevel, index, onOpen = { opened = rank })
         }
 
-        Panel(title = "Tes records", modifier = Modifier.padding(top = 6.dp)) {
-            Text("Maximum estimé sur une répétition (formule d'Epley)", style = DinoType.Small, color = DinoColors.InkDim, modifier = Modifier.padding(bottom = 4.dp))
+        Panel(title = "Tes records et ta progression", modifier = Modifier.padding(top = 6.dp)) {
+            Text(
+                "Maximum estimé sur une répétition (formule d'Epley). Touche un exercice pour voir ta courbe.",
+                style = DinoType.Small, color = DinoColors.InkDim, modifier = Modifier.padding(bottom = 4.dp),
+            )
             if (state.records.isEmpty()) {
                 Text("Tes records s'afficheront après ta première séance.", style = DinoType.Body, color = DinoColors.InkDim)
             }
-            state.records.forEachIndexed { i, r ->
+            val shownRecords = if (showAllRecords) state.records else state.records.take(8)
+            shownRecords.forEachIndexed { i, r ->
                 if (i > 0) HorizontalDivider(color = DinoColors.Line)
-                Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    Modifier.fillMaxWidth().pressClickable(onClickLabel = "Voir la progression") { chartFor = r }.padding(vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Column(Modifier.weight(1f)) {
                         Text(r.exercise.name, style = DinoType.BodyBold, color = DinoColors.Ink)
                         Text(
@@ -131,7 +143,11 @@ internal fun RanksScreen(uiState: RanksUiState) {
                         )
                     }
                     Text("${Formats.int(r.estimatedMaxKg.roundToInt())} kg", style = DinoType.Title.copy(fontSize = 15.sp), color = DinoColors.AmberInk)
+                    Text(" ›", style = DinoType.Title, color = DinoColors.InkFaint)
                 }
+            }
+            if (!showAllRecords && state.records.size > 8) {
+                PillButton("Voir les ${state.records.size} exercices", onClick = { showAllRecords = true }, style = PillStyle.Ghost, modifier = Modifier.padding(top = 8.dp))
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -139,6 +155,23 @@ internal fun RanksScreen(uiState: RanksUiState) {
             StatTile("Séries", Formats.int(state.sets), Modifier.weight(1f))
             StatTile("kcal salle", Formats.int(state.gymKcal), Modifier.weight(1f), DinoColors.Lava)
         }
+    }
+
+    chartFor?.let { r ->
+        val pts = state.progressions[r.exercise.id].orEmpty()
+        AlertDialog(
+            onDismissRequest = { chartFor = null },
+            containerColor = DinoColors.Bg,
+            title = { Text(r.exercise.name, style = DinoType.Title) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    ProgressChart(pts)
+                    Text(progressSummary(pts), style = DinoType.Body, color = DinoColors.Ink)
+                    Text("Chaque point = ta meilleure série de la séance, convertie en max sur une répétition.", style = DinoType.Small, color = DinoColors.InkDim)
+                }
+            },
+            confirmButton = { PillButton("Fermer", onClick = { chartFor = null }, style = PillStyle.Primary) },
+        )
     }
 
     opened?.let { rank ->

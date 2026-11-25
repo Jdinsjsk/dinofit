@@ -102,3 +102,21 @@ data class MealEntity(
     val fat: Double,
     val source: String,
 )
+
+@Entity(tableName = "favorite_meals", indices = [Index(value = ["name"], unique = true)])
+data class FavoriteMealEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val kcal: Double,
+    val protein: Double,
+    val carbs: Double,
+    val fat: Double,
+)
+
+/** [exerciseIds] : identifiants séparés par des virgules, dans l'ordre. */
+@Entity(tableName = "workout_templates")
+data class TemplateEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val exerciseIds: String,
+)
