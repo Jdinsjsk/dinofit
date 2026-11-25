@@ -18,7 +18,7 @@ android {
         // Chaque fabrication sur GitHub a un numéro plus grand : le téléphone l'accepte comme mise à jour.
         val run = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
         versionCode = run
-        versionName = "1.1.$run"
+        versionName = "2.0.$run"
     }
 
     // Toujours la même clé de signature : les mises à jour s'installent par-dessus, sans perdre les données.

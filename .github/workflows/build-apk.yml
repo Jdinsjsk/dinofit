@@ -40,6 +40,6 @@ jobs:
       # Publie aussi l'APK dans l'onglet « Releases » : téléchargeable directement depuis le téléphone.
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.${{ github.run_number }}
-          name: DinoFit 1.0.${{ github.run_number }}
+          tag_name: v2.0.${{ github.run_number }}
+          name: DinoFit 2.0.${{ github.run_number }}
           files: DinoFit.apk
